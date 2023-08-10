@@ -10,6 +10,11 @@ class Github {
 		const data = await fetch(`https://api.github.com/users/${userName}?client_id=${this.clientId}&client_secret=${this.clientSecret}`);
 		return await data.json()
 	}
+
+	async getRepos(userName) {
+        const data = await fetch(`https://api.github.com/users/${userName}/repos?sort=created:asc&per_page=5&client_id=${this.clientId}&client_secret=${this.clientSecret}`);
+        return await data.json();
+    }
 }
 
 class UI {
@@ -46,12 +51,36 @@ class UI {
 
 	showError(message) {
 		const div = document.createElement('div');
-		div.classList.add('alert alert-danger')
+		div.classList = ('alert alert-danger');
 		div.appendChild(document.createTextNode(message));
 
-		const container = document.querySelector('.searchContainer');
-		const search = document.querySelector('.search');
-		container.insertBefore(div, search)
+		const container = document.querySelector('.searchError');
+		container.appendChild(div)
+		setTimeout(() => {
+			container.removeChild(div)
+		}, 2000);
+	}
+
+	showRepos(reposData) {
+		let output = '';
+		reposData.forEach(repo => {
+			output += `
+                <div class="card card-body mb-2">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <a href="${repo.html_url}" target="_blank">${repo.name}</a>
+                        </div>
+                        <div class="col-md-6">
+                            <span class="badge badge-primary">Stars: ${repo.stargazers_count}</span>
+                            <span class="badge badge-secondary">Watchers: ${repo.watchers_count}</span>
+                            <span class="badge badge-success">Forks: ${repo.forks_count}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+		})
+
+		document.querySelector('.repos').innerHTML = output;
 	}
 }
 
@@ -59,19 +88,29 @@ const github = new Github();
 const ui = new UI();
 
 const searchUser = document.querySelector('.searchUser')
+let searchTimeout;
 
 searchUser.addEventListener('keyup', (event) => {
 	const userText = event.target.value;
-	if (userText.trim() !== '') {
-		github.getUser(userText)
-		.then((data) => {
-			if (data.message === 'Not Found') {
-				ui.showError(data.message);
-			} else {
-				ui.showProfile(data);
-			}
-			// console.log(data);
-		})
-	}
-	
+
+	clearTimeout(searchTimeout);
+
+	searchTimeout = setTimeout(() => {
+		if (userText.trim() !== '') {
+			Promise.all([github.getUser(userText), github.getRepos(userText)])
+			.then(([data, reposData]) => {
+				if (data.message === 'Not Found') {
+					setTimeout(() => {
+						ui.showError(data.message);
+					}, 500);				
+				} else {
+					setTimeout(() => {
+						ui.showProfile(data);
+						ui.showRepos(reposData);
+					}, 300);
+				}
+				// console.log(data);
+			})
+		}
+	}, 500);
 })
